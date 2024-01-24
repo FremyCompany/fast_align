@@ -81,8 +81,22 @@ class TTable {
     counts[e].find(f)->second += x; // Ignore race conditions here.
   }
 
-  void NormalizeVB(const double alpha) {
-    ttable.swap(counts);
+  void NormalizeVB(const double alpha, const int should_keep_counts = 0) {
+    if (should_keep_counts == 0) ttable.swap(counts);
+    else {
+      // clear ttable
+      for (size_t i=0; i<ttable.size();++i) {
+        for (auto& prb : ttable[i]) {
+          prb.second = 0.0;
+        }
+      }
+      // copy counts to ttable
+      for (size_t i=0; i<counts.size();++i) {
+        for (auto& cnt : counts[i]) {
+          ttable[i][cnt.first] = cnt.second;
+        }
+      }
+    }
 #pragma omp parallel for schedule(dynamic)
     for (unsigned i = 0; i < ttable.size(); ++i) {
       double tot = 0;
@@ -94,12 +108,26 @@ class TTable {
       for (Word2Double::iterator it = cpd.begin(); it != cpd.end(); ++it)
         it->second = exp(Md::digamma(it->second + alpha) - digamma_tot);
     }
-    ClearCounts();
+    if (should_keep_counts == 0) ClearCounts();
     probs_initialized_ = true;
   }
 
-  void Normalize() {
-    ttable.swap(counts);
+  void Normalize(const int should_keep_counts = 0) {
+    if (should_keep_counts == 0) ttable.swap(counts);
+    else {
+      // clear ttable
+      for (size_t i=0; i<ttable.size();++i) {
+        for (auto& prb : ttable[i]) {
+          prb.second = 0.0;
+        }
+      }
+      // copy counts to ttable
+      for (size_t i=0; i<counts.size();++i) {
+        for (auto& cnt : counts[i]) {
+          ttable[i][cnt.first] = cnt.second;
+        }
+      }
+    }
 #pragma omp parallel for schedule(dynamic)
     for (unsigned i = 0; i < ttable.size(); ++i) {
       double tot = 0;
@@ -110,7 +138,7 @@ class TTable {
       for (Word2Double::iterator it = cpd.begin(); it != cpd.end(); ++it)
         it->second /= tot;
     }
-    ClearCounts();
+    if (should_keep_counts == 0) ClearCounts();
     probs_initialized_ = true;
   }
 
@@ -144,14 +172,15 @@ class TTable {
       const std::string& a = d.Convert(i);
       const Word2Double& cpd = ttable[i];
       double max_p = -1;
-      for (auto& it : cpd)
+      for (auto& it : cpd) {
         if (it.second > max_p) max_p = it.second;
+      }
       const double threshold = - log(max_p) * BEAM_THRESHOLD;
       for (auto& it : cpd) {
         const std::string& b = d.Convert(it.first);
         double c = log(it.second);
-        if (c >= threshold)
-          file << a << '\t' << b << '\t' << c << std::endl;
+        if (it.second > 0 && c >= threshold)
+          file << a << '\t' << b << '\t' << c << '\t' << const_cast<Word2Double&>(counts[i])[it.first] << std::endl;
       }
     }
     file.close();

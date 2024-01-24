@@ -420,9 +420,9 @@ int main(int argc, char** argv) {
         cerr << "     final tension: " << diagonal_tension << endl;
       }
       if (variational_bayes)
-        s2t.NormalizeVB(alpha);
+        s2t.NormalizeVB(alpha, (iter >= (ITERATIONS - 2)) ? 1 : 0);
       else
-        s2t.Normalize();
+        s2t.Normalize((iter >= (ITERATIONS - 2)) ? 1 : 0);
     }
   }
   if (!force_align && !conditional_probability_filename.empty()) {
